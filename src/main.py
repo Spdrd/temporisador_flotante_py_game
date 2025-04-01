@@ -6,14 +6,26 @@ import win32con
 import tkinter as tk
 import threading as thr
 
+pygame.mixer.init()
 time_remaining = 0  # Tiempo en segundos
+original_time = 0  # Guardar el tiempo original para reiniciar
 alert_times = []  # Lista de tiempos en los que cambiará a rojo
+
+def run_timmer():
+    timer_thread = thr.Thread(target=update_timer, daemon=True)
+    timer_thread.start()
+
+def play_alert_sound():
+    print("Deberia sonar")
+    pygame.mixer.Sound("src/audio/snap--out---of--it.mp3").play()
 
 def update_timer():
     global time_remaining
     while time_remaining > 0:
         pygame.time.delay(1000)
         time_remaining -= 1
+        if time_remaining in alert_times:
+            play_alert_sound()
 
 def format_time(seconds):
     minutes = seconds // 60
@@ -26,7 +38,7 @@ def set_background_window(WIDTH, HEIGHT):
     return screen
 
 def stopwatch_overlay():
-    global time_remaining
+    global time_remaining, original_time
     pygame.init()
     info = pygame.display.Info()
     WIDTH, HEIGHT = info.current_w, info.current_h
@@ -34,7 +46,9 @@ def stopwatch_overlay():
     TRANSPARENT_COLOR = (0,0,0)
     WHITE = (255, 255, 255)
     RED = (255, 0, 0)
+    GRAY = (50, 50, 50, 180)  # Gris semitransparente
     FONT = pygame.font.Font(None, 80)
+    ICON_FONT = pygame.font.Font(None, 40)
     
     if sys.platform == "win32":
         hwnd = pygame.display.get_wm_info()["window"]
@@ -50,17 +64,37 @@ def stopwatch_overlay():
     timer_thread = thr.Thread(target=update_timer, daemon=True)
     timer_thread.start()
     
+    # Posiciones
+    TIMER_RECT = pygame.Rect(WIDTH // 2 - 150, HEIGHT * 3 // 4 - 50, 300, 100)
+    RESET_BUTTON_RECT = pygame.Rect(WIDTH // 2 - 40, HEIGHT * 3 // 4 + 80, 80, 40)
+
+    
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if RESET_BUTTON_RECT.collidepoint(event.pos):  # Si el clic está dentro del botón
+                    time_remaining = original_time  # Reiniciar el temporizador
+                    run_timmer()
         
         screen.fill(TRANSPARENT_COLOR)
+        
+        # Dibujar fondo del temporizador
+        pygame.draw.rect(screen, (50, 50, 50, 180), TIMER_RECT, border_radius=15)
+        
+        # Cambiar color si es tiempo de alerta
         text_color = RED if time_remaining in alert_times else WHITE
         time_text = FONT.render(format_time(time_remaining), True, text_color)
-        text_rect = time_text.get_rect(center=(WIDTH//2, HEIGHT//4))
+        text_rect = time_text.get_rect(center=TIMER_RECT.center)
         screen.blit(time_text, text_rect)
+        
+        # Dibujar botón de reinicio
+        pygame.draw.rect(screen, RED, RESET_BUTTON_RECT, border_radius=10)
+        reset_text = ICON_FONT.render("R", True, WHITE)
+        reset_rect = reset_text.get_rect(center=RESET_BUTTON_RECT.center)
+        screen.blit(reset_text, reset_rect)
         
         pygame.display.flip()
         clock.tick(60)
@@ -69,7 +103,7 @@ def stopwatch_overlay():
     sys.exit()
 
 def get_timer_duration():
-    global time_remaining, alert_times
+    global time_remaining, original_time, alert_times
     root = tk.Tk()
     root.title("Configurar Temporizador")
     
@@ -97,10 +131,11 @@ def get_timer_duration():
     tk.Button(root, text="Agregar Alerta", command=add_alert_time).pack()
     
     def start_timer():
-        global time_remaining, alert_times
+        global time_remaining, original_time, alert_times
         minutes = int(entry_minutes.get()) if entry_minutes.get().isdigit() else 0
         seconds = int(entry_seconds.get()) if entry_seconds.get().isdigit() else 0
         time_remaining = minutes * 60 + seconds
+        original_time = time_remaining  # Guardar tiempo original
         alert_times.clear()
         for min_entry, sec_entry in alert_entries:
             min_val = int(min_entry.get()) if min_entry.get().isdigit() else 0
