@@ -42,9 +42,7 @@ class Stop_Watch_Overlay:
                     running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if RESET_BUTTON_RECT.collidepoint(event.pos):
-                        print("[MAIN] Reiniciando temporizador")
-                        pygame.time.delay(100)  # Pequeña pausa para que finalice
-                        gv.time_remaining = gv.original_time
+                        timer.reset()
             
             screen.fill(TRANSPARENT_COLOR)
 
